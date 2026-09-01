@@ -9,7 +9,7 @@ Architektura:
 - Gymello_mobile: Flutter, Riverpod, GoRouter, Supabase Flutter
 - Gymello_coachPanel: React, TypeScript, Vite, Supabase JS
 - Supabase: Auth, Postgres, Row Level Security, Realtime, Edge Functions i pg_cron
-- Google Cloud: Cloud Run dla panelu webowego
+- Vercel: hosting panelu webowego
 
 ## 2. Role i autoryzacja
 
@@ -247,20 +247,21 @@ Zmienne środowiskowe panelu:
 
 Service role key nie może trafić do panelu ani aplikacji mobilnej.
 
-## 16. Google Cloud
+## 16. Wdrożenie na Vercel
 
-Panel to aplikacja webowa. Właściwym hostingiem jest Cloud Run z kontenerem Nginx albo Firebase Hosting. Vertex AI jest usługą modeli i agentów AI, a nie hostingu SPA.
+Panel to aplikacja React i Vite wdrażana na Vercel. Nie potrzebujemy Cloud Run, Firebase Hosting ani Vertex AI.
 
 Zalecana procedura:
 
-1. zapisać zmienne Supabase w Secret Manager
-2. zbudować obraz Docker z repo coachPanel
-3. wdrożyć go do Cloud Run
-4. podpiąć domenę i HTTPS
-5. dodać URL panelu do Supabase Auth Redirect URLs i CORS
-6. wykonać smoke test logowania, zaproszenia i Realtime
+1. zaimportować repo Gymello_coachPanel do Vercel i wskazać gałąź produkcyjną
+2. ustawić Framework Preset: Vite
+3. ustawić Build Command: npm run build oraz Output Directory: dist
+4. dodać VITE_SUPABASE_URL i VITE_SUPABASE_PUBLISHABLE_KEY w Vercel Environment Variables
+5. podpiąć domenę i HTTPS w Vercel
+6. dodać URL panelu do Supabase Auth Redirect URLs i CORS
+7. wykonać smoke test logowania, zaproszenia i Realtime
 
-Repo panelu zawiera Dockerfile, cloudbuild.yaml i DEPLOYMENT.md.
+Vercel hostuje wyłącznie panel. Supabase hostuje Auth, bazę, Realtime, Edge Functions i scheduler.
 
 ## 17. Migracje
 
