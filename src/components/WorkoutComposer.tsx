@@ -41,6 +41,17 @@ export function WorkoutComposer({ planWorkoutId }: { planWorkoutId: string }) {
     });
     if (error) setMessage(error.message); else { setExerciseId(""); await load(); }
   }
+  async function saveAsTemplate() {
+    if (!supabase) return;
+    const name = window.prompt("Name this reusable workout session");
+    if (!name?.trim()) return;
+    const { error } = await supabase.rpc("save_coach_plan_workout_as_template", {
+      p_plan_workout_id: planWorkoutId,
+      p_name: name.trim(),
+      p_description: null,
+    });
+    setMessage(error ? error.message : "Workout saved to your private template library.");
+  }
   async function addSet(event: FormEvent) {
     event.preventDefault(); if (!supabase || !setExerciseId) return;
     const position = sets.filter((item) => item.exerciseId === setExerciseId).length + 1;
@@ -53,7 +64,7 @@ export function WorkoutComposer({ planWorkoutId }: { planWorkoutId: string }) {
   }
 
   return <div className="workout-composer">
-    <h3>Manual workout builder</h3><p>Add exercises from the Supabase exercise library, then define planned sets, reps and weight.</p>
+    <div className="panel-head"><div><h3>Manual workout builder</h3><p>Add exercises from the Supabase exercise library, then define planned sets, reps and weight.</p></div><button type="button" className="button secondary" onClick={() => void saveAsTemplate()}>Save as session</button></div>
     {message && <p className="form-error">{message}</p>}
     <form className="inline-form" onSubmit={addExercise}><select value={exerciseId} onChange={(event) => setExerciseId(event.target.value)}><option value="">Choose exercise</option>{catalogue.map((exercise) => <option key={exercise.id} value={exercise.id}>{exercise.name}</option>)}</select><button className="button secondary">Add exercise</button></form>
     <ul className="plain-list">{planned.map((exercise) => <li key={exercise.id}><strong>{exercise.position}. {exercise.name}</strong><span>{sets.filter((item) => item.exerciseId === exercise.id).map((set) => "Set " + set.number + ": " + set.repsMin + " reps" + (set.weight !== null ? " @ " + set.weight + " kg" : "")).join(" · ") || "No prescribed sets"}</span></li>)}</ul>
