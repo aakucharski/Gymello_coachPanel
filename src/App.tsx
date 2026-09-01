@@ -177,7 +177,7 @@ function ClientList({ clients, selected, onSelect, onRefresh }: { clients: Clien
 }
 
 function InvitePanel({ actor, role, clients }: { actor: User; role: AppRole; clients: Client[] }) {
-  const [inviteRole, setInviteRole] = useState<"COACH" | "CLIENT">(role === "MASTER_ADMIN" ? "COACH" : "CLIENT");
+  const inviteRole: "COACH" | "CLIENT" = role === "MASTER_ADMIN" ? "COACH" : "CLIENT";
   const [email, setEmail] = useState("");
   const [coachUid, setCoachUid] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -193,9 +193,8 @@ function InvitePanel({ actor, role, clients }: { actor: User; role: AppRole; cli
   }
   return <section className="content-page"><p className="eyebrow">Access control</p><h1>Invite a person</h1><p className="lead">Roles are assigned by the server. A coach can invite client accounts only. Clients cannot access this dashboard.</p>
     <form className="form-card" onSubmit={submit}>
-      {role === "MASTER_ADMIN" && <label>Role<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "COACH" | "CLIENT")}><option value="COACH">Coach</option><option value="CLIENT">Client</option></select></label>}
+      {role === "MASTER_ADMIN" && <p className="muted">Master administrators invite coach accounts. Each coach invites only their own clients.</p>}
       <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required placeholder="person@example.com" /></label>
-      {role === "MASTER_ADMIN" && inviteRole === "CLIENT" && <label>Coach<select value={coachUid} onChange={(event) => setCoachUid(event.target.value)} required><option value="">Choose coach</option>{clients.map((client) => <option key={client.uid} value={client.uid}>{client.name}</option>)}</select><small>The selected list contains your visible client relationships. For a new client, select a coach from the master-admin coach list in the next build.</small></label>}
       {message && <p className={message === "Invitation email sent." ? "form-success" : "form-error"}>{message}</p>}
       <button className="button primary" disabled={busy}>{busy ? "Sending…" : "Send invitation"}</button>
     </form>
