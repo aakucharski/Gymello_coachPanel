@@ -263,15 +263,19 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
   const [mealFats, setMealFats] = useState("15");
   const [workoutName, setWorkoutName] = useState("");
   const [workoutMinutes, setWorkoutMinutes] = useState("45");
+  const [coachComment, setCoachComment] = useState("");
+  const [recommendations, setRecommendations] = useState("");
 
   async function loadPlan() {
     if (!supabase) return;
     setMessage(null);
     const { data, error } = await supabase.from("coachPlanDays").select("coachPlanDays__id,coachPlanDays__date,coachPlanDays__status,coachPlanDays__coachComment,coachPlanDays__recommendations").eq("coachPlanDays__clientUid", client.uid).eq("coachPlanDays__date", date).maybeSingle();
     if (error) { setMessage(error.message); return; }
-    if (!data) { setPlan(null); setMeals([]); setWorkouts([]); return; }
+    if (!data) { setPlan(null); setMeals([]); setWorkouts([]); setCoachComment(""); setRecommendations(""); return; }
     const current = { id: data.coachPlanDays__id, date: data.coachPlanDays__date, status: data.coachPlanDays__status, comment: data.coachPlanDays__coachComment, recommendations: data.coachPlanDays__recommendations } as PlanDay;
     setPlan(current);
+    setCoachComment(current.comment ?? "");
+    setRecommendations(current.recommendations ?? "");
     const [mealResponse, workoutResponse] = await Promise.all([
       supabase.from("coachPlanMeals").select("coachPlanMeals__id,coachPlanMeals__name,coachPlanMeals__mealType,coachPlanMeals__targetKcal,coachPlanMeals__targetProteinG,coachPlanMeals__targetCarbsG,coachPlanMeals__targetFatsG,coachPlanMeals__completionStatus").eq("coachPlanMeals__planDayId", current.id).order("coachPlanMeals__position"),
       supabase.from("coachPlanWorkouts").select("coachPlanWorkouts__id,coachPlanWorkouts__name,coachPlanWorkouts__scheduledStartAt,coachPlanWorkouts__targetMinutes,coachPlanWorkouts__completionStatus").eq("coachPlanWorkouts__planDayId", current.id).order("coachPlanWorkouts__position"),
@@ -293,6 +297,16 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
     setPlan(current); return current;
   }
 
+  async function saveGuidance() {
+    if (!supabase) return;
+    const current = await ensurePlan(); if (!current) return;
+    const { error } = await supabase.from("coachPlanDays").update({
+      coachPlanDays__coachComment: coachComment.trim() || null,
+      coachPlanDays__recommendations: recommendations.trim() || null,
+    }).eq("coachPlanDays__id", current.id);
+    setMessage(error ? error.message : "Daily comments and recommendations saved.");
+    if (!error) await loadPlan();
+  }
   async function suggestTdee() {
     if (!supabase) return;
     const { data, error } = await supabase.rpc("calculate_coach_tdee", { p_client_uid: client.uid });
@@ -344,6 +358,7 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
   }
   return <div className="stack"><section className="surface plan-head"><div><h2>Daily plan</h2><p>The draft is only visible to you. Publishing makes it available to the client app.</p></div><label>Date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><button className="button primary" onClick={() => void publish()}>{plan?.status === "PUBLISHED" ? "Published" : "Publish plan"}</button></section>
     {message && <div className={message.includes("saved") ? "banner success" : "banner error"}>{message}</div>}
+    <section className="surface"><h2>Coach guidance</h2><label>Comment for the client<textarea value={coachComment} onChange={(event) => setCoachComment(event.target.value)} placeholder="Focus for today" /></label><label>Recommendations<textarea value={recommendations} onChange={(event) => setRecommendations(event.target.value)} placeholder="Recovery, technique or nutrition guidance" /></label><button className="button secondary" onClick={() => void saveGuidance()}>Save guidance</button></section>
     <section className="surface"><div className="panel-head"><div><h2>Nutrition target</h2><p>Gymello suggests TDEE from the client's profile and latest weight. Every coach revision is retained.</p></div><button className="button secondary" onClick={() => void suggestTdee()}>Calculate TDEE</button></div>
       {suggestion !== null && <div className="inline-action"><strong>{suggestion} kcal/day suggested</strong><label>Coach target<input value={coachKcal} onChange={(event) => setCoachKcal(event.target.value)} inputMode="numeric" aria-label="Coach kcal target" /></label><button className="button primary" onClick={() => void saveTarget()}>Save as coach version</button></div>}
     </section>
