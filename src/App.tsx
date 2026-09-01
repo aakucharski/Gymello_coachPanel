@@ -5,7 +5,7 @@ import { WorkoutComposer } from "./components/WorkoutComposer";
 import type { AppRole, Client, Notification, PlanDay } from "./types";
 
 type Tab = "clients" | "invites" | "notifications";
-type PlanMeal = { id: string; name: string; mealType: string; kcal: number; status: string };
+type PlanMeal = { id: string; name: string; mealType: string; kcal: number; protein: number; carbs: number; fats: number; status: string };
 type PlanWorkout = { id: string; name: string; startAt: string | null; minutes: number | null; status: string };
 type Availability = { day: number; available: boolean; minutes: number; start: string | null };
 type DashboardData = { nutrition: Array<{ date: string; targetKcal: number; kcal: number }>; workouts: Array<{ date: string; completedSessions: number; volumeKg: number }>; checkins: Array<{ clientCheckIns__date: string; clientCheckIns__steps: number | null; clientCheckIns__stressLevel: number | null }> };
@@ -254,9 +254,13 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
   const [meals, setMeals] = useState<PlanMeal[]>([]);
   const [workouts, setWorkouts] = useState<PlanWorkout[]>([]);
   const [suggestion, setSuggestion] = useState<number | null>(null);
+  const [coachKcal, setCoachKcal] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [mealName, setMealName] = useState("");
   const [mealKcal, setMealKcal] = useState("500");
+  const [mealProtein, setMealProtein] = useState("30");
+  const [mealCarbs, setMealCarbs] = useState("50");
+  const [mealFats, setMealFats] = useState("15");
   const [workoutName, setWorkoutName] = useState("");
   const [workoutMinutes, setWorkoutMinutes] = useState("45");
 
@@ -269,11 +273,11 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
     const current = { id: data.coachPlanDays__id, date: data.coachPlanDays__date, status: data.coachPlanDays__status, comment: data.coachPlanDays__coachComment, recommendations: data.coachPlanDays__recommendations } as PlanDay;
     setPlan(current);
     const [mealResponse, workoutResponse] = await Promise.all([
-      supabase.from("coachPlanMeals").select("coachPlanMeals__id,coachPlanMeals__name,coachPlanMeals__mealType,coachPlanMeals__targetKcal,coachPlanMeals__completionStatus").eq("coachPlanMeals__planDayId", current.id).order("coachPlanMeals__position"),
+      supabase.from("coachPlanMeals").select("coachPlanMeals__id,coachPlanMeals__name,coachPlanMeals__mealType,coachPlanMeals__targetKcal,coachPlanMeals__targetProteinG,coachPlanMeals__targetCarbsG,coachPlanMeals__targetFatsG,coachPlanMeals__completionStatus").eq("coachPlanMeals__planDayId", current.id).order("coachPlanMeals__position"),
       supabase.from("coachPlanWorkouts").select("coachPlanWorkouts__id,coachPlanWorkouts__name,coachPlanWorkouts__scheduledStartAt,coachPlanWorkouts__targetMinutes,coachPlanWorkouts__completionStatus").eq("coachPlanWorkouts__planDayId", current.id).order("coachPlanWorkouts__position"),
     ]);
     if (mealResponse.error || workoutResponse.error) { setMessage(mealResponse.error?.message ?? workoutResponse.error?.message ?? "Could not load plan items"); return; }
-    setMeals((mealResponse.data ?? []).map((row) => ({ id: row.coachPlanMeals__id, name: row.coachPlanMeals__name, mealType: row.coachPlanMeals__mealType, kcal: Number(row.coachPlanMeals__targetKcal), status: row.coachPlanMeals__completionStatus })));
+    setMeals((mealResponse.data ?? []).map((row) => ({ id: row.coachPlanMeals__id, name: row.coachPlanMeals__name, mealType: row.coachPlanMeals__mealType, kcal: Number(row.coachPlanMeals__targetKcal), protein: Number(row.coachPlanMeals__targetProteinG), carbs: Number(row.coachPlanMeals__targetCarbsG), fats: Number(row.coachPlanMeals__targetFatsG), status: row.coachPlanMeals__completionStatus })));
     setWorkouts((workoutResponse.data ?? []).map((row) => ({ id: row.coachPlanWorkouts__id, name: row.coachPlanWorkouts__name, startAt: row.coachPlanWorkouts__scheduledStartAt, minutes: row.coachPlanWorkouts__targetMinutes, status: row.coachPlanWorkouts__completionStatus })));
   }
   useEffect(() => { void loadPlan(); }, [client.uid, date]);
@@ -293,13 +297,17 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
     if (!supabase) return;
     const { data, error } = await supabase.rpc("calculate_coach_tdee", { p_client_uid: client.uid });
     if (error) { setMessage(error.message); return; }
-    setSuggestion(Number((data as { tdeeKcal: number }).tdeeKcal));
+    const tdee = Number((data as { tdeeKcal: number }).tdeeKcal);
+    setSuggestion(tdee);
+    setCoachKcal(String(tdee));
   }
   async function saveTarget() {
     if (!supabase || suggestion === null) return;
     const current = await ensurePlan(); if (!current) return;
     const { data: revisions } = await supabase.from("coachNutritionTargetRevisions").select("coachNutritionTargetRevisions__version").eq("coachNutritionTargetRevisions__planDayId", current.id).order("coachNutritionTargetRevisions__version", { ascending: false }).limit(1);
-    const kcal = suggestion; const protein = Math.round(kcal * 0.3 / 4); const fats = Math.round(kcal * 0.25 / 9); const carbs = Math.round((kcal - protein * 4 - fats * 9) / 4);
+    const kcal = Number(coachKcal);
+    if (!Number.isFinite(kcal) || kcal <= 0) { setMessage("Enter a valid coach calorie target."); return; }
+    const protein = Math.round(kcal * 0.3 / 4); const fats = Math.round(kcal * 0.25 / 9); const carbs = Math.round((kcal - protein * 4 - fats * 9) / 4);
     const { error } = await supabase.from("coachNutritionTargetRevisions").insert({
       coachNutritionTargetRevisions__planDayId: current.id, coachNutritionTargetRevisions__version: Number(revisions?.[0]?.coachNutritionTargetRevisions__version ?? 0) + 1,
       coachNutritionTargetRevisions__suggestedTdeeKcal: kcal, coachNutritionTargetRevisions__suggestedProteinG: protein, coachNutritionTargetRevisions__suggestedCarbsG: carbs, coachNutritionTargetRevisions__suggestedFatsG: fats,
@@ -314,7 +322,7 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
     const { data: last } = await supabase.from("coachPlanMeals").select("coachPlanMeals__position").eq("coachPlanMeals__planDayId", current.id).order("coachPlanMeals__position", { ascending: false }).limit(1);
     const { error } = await supabase.from("coachPlanMeals").insert({
       coachPlanMeals__planDayId: current.id, coachPlanMeals__mealType: "LUNCH", coachPlanMeals__name: mealName.trim(),
-      coachPlanMeals__targetKcal: Number(mealKcal), coachPlanMeals__targetProteinG: 0, coachPlanMeals__targetCarbsG: 0, coachPlanMeals__targetFatsG: 0,
+      coachPlanMeals__targetKcal: Number(mealKcal), coachPlanMeals__targetProteinG: Number(mealProtein), coachPlanMeals__targetCarbsG: Number(mealCarbs), coachPlanMeals__targetFatsG: Number(mealFats),
       coachPlanMeals__position: Number(last?.[0]?.coachPlanMeals__position ?? 0) + 1,
     });
     if (error) setMessage(error.message); else { setMealName(""); await loadPlan(); }
@@ -337,9 +345,9 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
   return <div className="stack"><section className="surface plan-head"><div><h2>Daily plan</h2><p>The draft is only visible to you. Publishing makes it available to the client app.</p></div><label>Date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><button className="button primary" onClick={() => void publish()}>{plan?.status === "PUBLISHED" ? "Published" : "Publish plan"}</button></section>
     {message && <div className={message.includes("saved") ? "banner success" : "banner error"}>{message}</div>}
     <section className="surface"><div className="panel-head"><div><h2>Nutrition target</h2><p>Gymello suggests TDEE from the client's profile and latest weight. Every coach revision is retained.</p></div><button className="button secondary" onClick={() => void suggestTdee()}>Calculate TDEE</button></div>
-      {suggestion !== null && <div className="inline-action"><strong>{suggestion} kcal/day suggested</strong><button className="button primary" onClick={() => void saveTarget()}>Save as coach version</button></div>}
+      {suggestion !== null && <div className="inline-action"><strong>{suggestion} kcal/day suggested</strong><label>Coach target<input value={coachKcal} onChange={(event) => setCoachKcal(event.target.value)} inputMode="numeric" aria-label="Coach kcal target" /></label><button className="button primary" onClick={() => void saveTarget()}>Save as coach version</button></div>}
     </section>
-    <div className="two-column"><section className="surface"><h2>Meals</h2><form className="inline-form" onSubmit={addMeal}><input value={mealName} onChange={(event) => setMealName(event.target.value)} placeholder="Meal name" required /><input value={mealKcal} onChange={(event) => setMealKcal(event.target.value)} inputMode="numeric" aria-label="Target calories" /><button className="button secondary">Add meal</button></form><ul className="plain-list">{meals.map((meal) => <li key={meal.id}><strong>{meal.name}</strong><span>{meal.mealType.toLowerCase()} · {meal.kcal} kcal · {meal.status.toLowerCase()}</span></li>)}</ul></section>
+    <div className="two-column"><section className="surface"><h2>Meals</h2><form className="inline-form" onSubmit={addMeal}><input value={mealName} onChange={(event) => setMealName(event.target.value)} placeholder="Meal name" required /><input value={mealKcal} onChange={(event) => setMealKcal(event.target.value)} inputMode="numeric" aria-label="Target calories" /><input value={mealProtein} onChange={(event) => setMealProtein(event.target.value)} inputMode="numeric" aria-label="Protein grams" placeholder="protein g" /><input value={mealCarbs} onChange={(event) => setMealCarbs(event.target.value)} inputMode="numeric" aria-label="Carbs grams" placeholder="carbs g" /><input value={mealFats} onChange={(event) => setMealFats(event.target.value)} inputMode="numeric" aria-label="Fats grams" placeholder="fat g" /><button className="button secondary">Add meal</button></form><ul className="plain-list">{meals.map((meal) => <li key={meal.id}><strong>{meal.name}</strong><span>{meal.mealType.toLowerCase()} · {meal.kcal} kcal · P {meal.protein} g · C {meal.carbs} g · F {meal.fats} g · {meal.status.toLowerCase()}</span></li>)}</ul></section>
       <section className="surface"><h2>Workouts</h2><form className="inline-form" onSubmit={addWorkout}><input value={workoutName} onChange={(event) => setWorkoutName(event.target.value)} placeholder="Workout name" required /><input value={workoutMinutes} onChange={(event) => setWorkoutMinutes(event.target.value)} inputMode="numeric" aria-label="Target minutes" /><button className="button secondary">Add workout</button></form><ul className="plain-list">{workouts.map((workout) => <li key={workout.id}><strong>{workout.name}</strong><span>{workout.minutes ?? "—"} min · {workout.status.toLowerCase()}</span></li>)}</ul>{workouts[0] && <WorkoutComposer planWorkoutId={workouts[0].id} />}</section></div>
   </div>;
 }
