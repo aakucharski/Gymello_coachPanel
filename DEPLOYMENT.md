@@ -1,25 +1,41 @@
-# Deployment
+# Deploy Gymello Coach Panel on Vercel
 
-The coach panel is a static React application. It should be deployed as a container to **Cloud Run**, not Vertex AI. Vertex AI provides AI-model services and is not a secure frontend hosting platform.
+## 1. Import project
 
-## Required build variables
+1. Open Vercel and import the GitHub repository aakucharski/Gymello_coachPanel.
+2. Select the production branch after review and merge.
+3. Vercel detects Vite automatically.
 
-Create a production environment file in the deployment pipeline, never in Git:
+## 2. Build settings
 
-```
-VITE_SUPABASE_URL=https://uiytfdlssxbsempboldt.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=<project publishable key>
-```
+- Framework Preset: Vite
+- Build Command: npm run build
+- Output Directory: dist
+- Install Command: npm install
 
-Only the public project URL and publishable key belong in the web build. Do not expose a service role key.
+## 3. Environment variables
 
-## Cloud Run
+Set these for Preview and Production:
 
-```bash
-gcloud builds submit --config cloudbuild.yaml --substitutions _IMAGE=REGION-docker.pkg.dev/PROJECT/gymello/coach-panel:latest
-gcloud run deploy gymello-coach-panel \
-  --image REGION-docker.pkg.dev/PROJECT/gymello/coach-panel:latest \
-  --region REGION --allow-unauthenticated --port 8080
-```
+    VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+    VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 
-Before go-live, add the Cloud Run URL to Supabase Auth redirect URLs and set the `APP_ORIGIN` Edge Function secret to the same origin.
+Never add the Supabase service_role key to Vercel. Browser code must use only the publishable key.
+
+## 4. Supabase configuration
+
+After the first Vercel deployment, add the generated panel URL and final custom domain to:
+
+- Supabase Auth Redirect URLs
+- Supabase Auth Site URL when it becomes the primary panel domain
+- the APP_ORIGIN secret used by the invitation Edge Function
+
+## 5. Smoke test
+
+1. Sign in as master_admin.
+2. Invite a coach.
+3. Sign in as coach and invite a client.
+4. Publish a client plan.
+5. Confirm the notifications and coach chat work.
+
+Vercel hosts the React panel. Supabase provides Auth, the database, Realtime, Edge Functions and the payment-alert scheduler.
