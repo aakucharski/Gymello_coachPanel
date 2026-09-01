@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { isConfigured, supabase } from "./lib/supabase";
+import { WorkoutComposer } from "./components/WorkoutComposer";
 import type { AppRole, Client, Notification, PlanDay } from "./types";
 
 type Tab = "clients" | "invites" | "notifications";
@@ -340,7 +341,7 @@ function PlanEditor({ coach, client }: { coach: User; client: Client }) {
       {suggestion !== null && <div className="inline-action"><strong>{suggestion} kcal/day suggested</strong><button className="button primary" onClick={() => void saveTarget()}>Save as coach version</button></div>}
     </section>
     <div className="two-column"><section className="surface"><h2>Meals</h2><form className="inline-form" onSubmit={addMeal}><input value={mealName} onChange={(event) => setMealName(event.target.value)} placeholder="Meal name" required /><input value={mealKcal} onChange={(event) => setMealKcal(event.target.value)} inputMode="numeric" aria-label="Target calories" /><button className="button secondary">Add meal</button></form><ul className="plain-list">{meals.map((meal) => <li key={meal.id}><strong>{meal.name}</strong><span>{meal.mealType.toLowerCase()} · {meal.kcal} kcal · {meal.status.toLowerCase()}</span></li>)}</ul></section>
-      <section className="surface"><h2>Workouts</h2><form className="inline-form" onSubmit={addWorkout}><input value={workoutName} onChange={(event) => setWorkoutName(event.target.value)} placeholder="Workout name" required /><input value={workoutMinutes} onChange={(event) => setWorkoutMinutes(event.target.value)} inputMode="numeric" aria-label="Target minutes" /><button className="button secondary">Add workout</button></form><ul className="plain-list">{workouts.map((workout) => <li key={workout.id}><strong>{workout.name}</strong><span>{workout.minutes ?? "—"} min · {workout.status.toLowerCase()}</span></li>)}</ul></section></div>
+      <section className="surface"><h2>Workouts</h2><form className="inline-form" onSubmit={addWorkout}><input value={workoutName} onChange={(event) => setWorkoutName(event.target.value)} placeholder="Workout name" required /><input value={workoutMinutes} onChange={(event) => setWorkoutMinutes(event.target.value)} inputMode="numeric" aria-label="Target minutes" /><button className="button secondary">Add workout</button></form><ul className="plain-list">{workouts.map((workout) => <li key={workout.id}><strong>{workout.name}</strong><span>{workout.minutes ?? "—"} min · {workout.status.toLowerCase()}</span></li>)}</ul>{workouts[0] && <WorkoutComposer planWorkoutId={workouts[0].id} />}</section></div>
   </div>;
 }
 
